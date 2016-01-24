@@ -20,19 +20,26 @@ typedef long uint32
 char *readline(void);
 int main(int argc, char *argv[]) {
         char myprompt[] = "vaibshell:~$ ", *line = NULL;
-	char *temp = NULL, *str, *token, *saveptr, *command, **argp, *filename;
+	char *temp = NULL, *str, *token, *saveptr, *command, **argp, *op_filename, *ip_filename;
 	int i, j, status, exec = 0;
 	pid_t pid, w;
 	char malloc_error[] = "malloc failed:\n";
-	int fd, OUT_REDIR, STDOUT; 
-	filename = (char *) malloc(MAX);
-	if(filename == NULL) {
+	int fd_out, OUT_REDIR, STDOUT; 
+	int fd_in, IN_REDIR, STDIN; 
+	op_filename = (char *) malloc(MAX);
+	if(op_filename == NULL) {
+		write(1, malloc_error, sizeof(malloc_error));
+		exit(EXIT_FAILURE);
+	}
+	ip_filename = (char *) malloc(MAX);
+	if(ip_filename == NULL) {
 		write(1, malloc_error, sizeof(malloc_error));
 		exit(EXIT_FAILURE);
 	}
 	
         while(1) {
 		OUT_REDIR = 0;
+		IN_REDIR = 0;
                 write(1, "\n", 1);
                 write(1, myprompt, strlen(myprompt));
                 //sleep(2);
@@ -74,7 +81,7 @@ int main(int argc, char *argv[]) {
 		while(argp[i] != NULL) {
 			//printf("Came into while loop!\n");
 			if(strcmp(argp[i++], ">") == 0) {
-				strcpy(filename, argp[i]);
+				strcpy(op_filename, argp[i]);
 				argp[i - 1] = NULL;
 				OUT_REDIR = 1;
 				printf("OUT_REDIR = %d\n", OUT_REDIR);
@@ -82,6 +89,19 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		
+		/*code to detect ">" and take appropriate action*/
+		i = 0;
+		while(argp[i] != NULL) {
+			if(strcmp(argp[i++], "<") == 0) {
+				strcpy(ip_filename, argp[i]);
+				argp[i - 1] = NULL;
+				IN_REDIR = 1;
+				printf("IN_REDIR = %d\n", IN_REDIR);
+				break;
+			}
+		}
+
+
 		// Code to check whether strtok works or not? by printing the contents of command and arguments
 		//printf("%s ", command);
 		/*i = 0;
@@ -102,12 +122,23 @@ int main(int argc, char *argv[]) {
 			if(OUT_REDIR) {
 				STDOUT = dup(1);
 				close(1);
-				fd = open(filename, O_WRONLY | O_CREAT, S_IRWXU);
-				if(fd == -1) {
+				fd_out = open(op_filename, O_WRONLY | O_CREAT, S_IRWXU);
+				if(fd_out == -1) {
 					perror("File open failed");
 					exit(EXIT_FAILURE);
 				}
-				printf("fd = %d\n", fd);
+				printf("fd_out = %d\n", fd_out);
+				
+			}
+			if(IN_REDIR) {
+				STDIN = dup(0);
+				close(0);
+				fd_in = open(ip_filename, O_RDONLY);
+				if(fd_in == -1) {
+					perror("File open failed");
+					exit(EXIT_FAILURE);
+				}
+				printf("fd_in = %d\n", fd_in);
 				
 			}
 			printf("Child pid is %ld \n", (long) getpid());
