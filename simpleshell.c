@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +18,8 @@ char *readline(void);
 int main(int argc, char *argv[]) {
         char myprompt[] = "vaibshell:~$ ", *line = NULL;
 	char *temp = NULL, *str, *token, *saveptr, *command, **argp;
-	int i, j;
+	int i, j, status;
+	pid_t pid, w;
 	char malloc_error[] = "malloc failed:\n";
         while(1) {
                 write(1, "\n", 1);
@@ -28,7 +31,7 @@ int main(int argc, char *argv[]) {
 			write(1, malloc_error, sizeof(malloc_error));
 			exit(EXIT_FAILURE);
 		}
-                write(1, line, strlen(line));
+                //write(1, line, strlen(line));
                 //Now, check the no. of void spaces in the input excluding it at the first and at the end
 		temp = (char *)malloc(strlen(line) + 1);
 		if(temp == NULL) {
@@ -44,12 +47,57 @@ int main(int argc, char *argv[]) {
 			}
 			if(j == 1) {
 				command = token;
+				printf("command = %s\n", command);
 			}
 			else {
 				argp[i++] = token;      //Don't we have to allocate memory for each argp[i] ? or it is allocated already?
+				printf("argument[%d] =  %s\n", i - 1, argp[i - 1]);
 			}
 		}
 		argp[i] = NULL;
+		
+		// Code to check whether strtok works or not? by printing the contents of command and arguments
+		/*printf("%s ", command);
+		i = 0;
+		while(1) {
+			if(argp[i] != NULL)
+				printf("%s ", argp[i++]);
+			else 
+				break;
+		}
+		printf("\n\n");*/
+		
+		pid = fork();
+		if(pid == -1) {
+			perror("fork");
+			exit(EXIT_FAILURE);
+		}
+		if(pid == 0) {// that means it is child
+			printf("Child pid is %ld \n", (long) getpid());
+			execvp(command, argp);
+		}
+		else {		//that means it is parent
+			// I didn't understand why we need to use loop, why can't we use waitpid() just once?
+			do {
+				w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
+				if(w == -1) {
+					perror("waitpid");
+					exit(EXIT_FAILURE);
+				}
+				if(WIFEXITED(status)) {
+					printf("exited, status=%d\n", WEXITSTATUS(status));
+				}
+				else if(WIFSIGNALED(status)) {
+					printf("killed by signal %d\n", WTERMSIG(status));
+				}
+				else if(WIFSTOPPED(status)) {
+					printf("stopped by signal %d\n", WSTOPSIG(status));
+				}
+				else if(WIFCONTINUED(status)) {
+					printf("continued\n");
+				}
+			} while(!WIFEXITED(status) && !WIFSIGNALED(status));
+		}
 		
 		free(line);
 		free(temp);
