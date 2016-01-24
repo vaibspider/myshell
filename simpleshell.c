@@ -18,7 +18,7 @@ char *readline(void);
 int main(int argc, char *argv[]) {
         char myprompt[] = "vaibshell:~$ ", *line = NULL;
 	char *temp = NULL, *str, *token, *saveptr, *command, **argp;
-	int i, j, status;
+	int i, j, status, exec = 0;
 	pid_t pid, w;
 	char malloc_error[] = "malloc failed:\n";
         while(1) {
@@ -46,8 +46,9 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 			if(j == 1) {
-				command = token;
-				printf("command = %s\n", command);
+				//command = token;
+				argp[i++] = token;
+				printf("argument[%d] = %s\n", i - 1, argp[i - 1]);
 			}
 			else {
 				argp[i++] = token;      //Don't we have to allocate memory for each argp[i] ? or it is allocated already?
@@ -74,7 +75,11 @@ int main(int argc, char *argv[]) {
 		}
 		if(pid == 0) {// that means it is child
 			printf("Child pid is %ld \n", (long) getpid());
-			execvp(command, argp);
+			exec = execvp(*argp, argp);
+			if(exec == -1) {
+				perror("exec failed");
+				exit(EXIT_FAILURE);
+			}
 		}
 		else {		//that means it is parent
 			// I didn't understand why we need to use loop, why can't we use waitpid() just once?
