@@ -1,15 +1,18 @@
 #include <stdio.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #ifdef LINUX
 typedef int uint32
 #endif
 #ifdef WINDOWS
 typedef long uint32
 #endif
+#define MAX 64
 // Below 2 lines are for the function readline()
 //#define SPACE 0
 //#define ALPHA 1
@@ -17,11 +20,19 @@ typedef long uint32
 char *readline(void);
 int main(int argc, char *argv[]) {
         char myprompt[] = "vaibshell:~$ ", *line = NULL;
-	char *temp = NULL, *str, *token, *saveptr, *command, **argp;
+	char *temp = NULL, *str, *token, *saveptr, *command, **argp, *filename;
 	int i, j, status, exec = 0;
 	pid_t pid, w;
 	char malloc_error[] = "malloc failed:\n";
+	int fd, OUT_REDIR, STDOUT; 
+	filename = (char *) malloc(MAX);
+	if(filename == NULL) {
+		write(1, malloc_error, sizeof(malloc_error));
+		exit(EXIT_FAILURE);
+	}
+	
         while(1) {
+		OUT_REDIR = 0;
                 write(1, "\n", 1);
                 write(1, myprompt, strlen(myprompt));
                 //sleep(2);
@@ -31,7 +42,7 @@ int main(int argc, char *argv[]) {
 			write(1, malloc_error, sizeof(malloc_error));
 			exit(EXIT_FAILURE);
 		}
-                //write(1, line, strlen(line));
+		//write(1, line, strlen(line));
                 //Now, check the no. of void spaces in the input excluding it at the first and at the end
 		temp = (char *)malloc(strlen(line) + 1);
 		if(temp == NULL) {
@@ -57,9 +68,23 @@ int main(int argc, char *argv[]) {
 		}
 		argp[i] = NULL;
 		
-		// Code to check whether strtok works or not? by printing the contents of command and arguments
-		/*printf("%s ", command);
+		/*code to detect ">" and take appropriate action*/
 		i = 0;
+		//printf("Came upto this!\n");
+		while(argp[i] != NULL) {
+			//printf("Came into while loop!\n");
+			if(strcmp(argp[i++], ">") == 0) {
+				strcpy(filename, argp[i]);
+				argp[i - 1] = NULL;
+				OUT_REDIR = 1;
+				printf("OUT_REDIR = %d\n", OUT_REDIR);
+				break;
+			}
+		}
+		
+		// Code to check whether strtok works or not? by printing the contents of command and arguments
+		//printf("%s ", command);
+		/*i = 0;
 		while(1) {
 			if(argp[i] != NULL)
 				printf("%s ", argp[i++]);
@@ -74,6 +99,17 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 		if(pid == 0) {// that means it is child
+			if(OUT_REDIR) {
+				STDOUT = dup(1);
+				close(1);
+				fd = open(filename, O_WRONLY | O_CREAT, S_IRWXU);
+				if(fd == -1) {
+					perror("File open failed");
+					exit(EXIT_FAILURE);
+				}
+				printf("fd = %d\n", fd);
+				
+			}
 			printf("Child pid is %ld \n", (long) getpid());
 			exec = execvp(*argp, argp);
 			if(exec == -1) {
