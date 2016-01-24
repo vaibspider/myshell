@@ -7,6 +7,10 @@ typedef int uint32
 #ifdef WINDOWS
 typedef long uint32
 #endif
+// Below 2 lines are for the function readline()
+#define SPACE 0
+#define ALPHA 1
+
 char *readline(void);
 int main() {
         char myprompt[] = "vaibshell:~$ ", *line = NULL;
@@ -34,14 +38,20 @@ char *readline() {
         }
         ch = getchar();
         i = 0;
+	state = SPACE;
         while(ch != '\n' && ch != EOF) { // After pressing Ctrl+D 2 times only then  it is detecting it, why?
-                str[i++] = ch;
-                ch = getchar();
-                if(i == SIZE - 1) {
-                        SIZE *= 2;
-                        str = realloc(str, SIZE);
-                        //if realloc fails, then what to do?
-                }
+		if(ch != ' ') {
+			state = ALPHA;
+		}
+		if(state == ALPHA) {
+			str[i++] = ch;
+			if(i == SIZE - 1) {
+				SIZE *= 2;
+				str = realloc(str, SIZE);
+				//if realloc fails, then what to do?
+			}
+		}
+		ch = getchar();
         }
         // Here came means it exited from while either due to \n or EOF
         str[i] = '\0';
