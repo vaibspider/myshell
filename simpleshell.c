@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	
+	size = MAX - 1;
         while(1) {
 		OUT_REDIR = 0;
 		IN_REDIR = 0;
@@ -50,7 +51,6 @@ int main(int argc, char *argv[]) {
 
                 write(1, "\n", 1);
 		/*code to specify what to show as a prompt depending on the current directory */
-		size = MAX - 1;
 		do {
 			cwd = getcwd(buf, size);
 			if(cwd == NULL) {
@@ -63,10 +63,16 @@ int main(int argc, char *argv[]) {
 
                 //sleep(2);
                 line = readline();
+		
+		/*code to check if line is empty */
+		if(strlen(line) == 0) {
+			continue;
+		}
 		//exits when "exit" command is used
 		if(strcmp(line, "exit") == 0) {
 			break;
 		}
+		
 		argp = (char **) malloc((((strlen(line) + 1) / 2) + 1)* sizeof(char *));
 		if(argp == NULL) {
 			write(1, malloc_error, sizeof(malloc_error));
@@ -101,9 +107,15 @@ int main(int argc, char *argv[]) {
 		n = i;
 		int argc = i;
 		
+		if(argc == 0) {
+			continue;
+		}
 		/*code to execute "cd <directoryname>" command */
 		if(strcmp(argp[0], "cd") == 0) {
-			if(argc != 2) {
+			if(argc == 1) {
+				argp[1] = "/home/vaibhav";
+			}
+			else if(argc != 2) {
 				fprintf(stderr, "Usage: %s <directory_path>\n", argp[0]);
 				exit(EXIT_FAILURE);
 			}
@@ -227,6 +239,8 @@ int main(int argc, char *argv[]) {
 			} while(!WIFEXITED(status) && !WIFSIGNALED(status));
 		}
 		
+		free(mypromt);
+		free(buf);
 		free(line);
 		free(temp);
 		free(argp);
