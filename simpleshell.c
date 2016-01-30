@@ -6,22 +6,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <error.h>
 
-#define MAX 128 
+#define MAX 256
 // Below 2 lines are for the function readline()
 //#define SPACE 0
 //#define ALPHA 1
 
 char *readline(void);
 int main(int argc, char *argv[]) {
+	int argcount, dir;
 	char malloc_error[] = "malloc failed:\n";
-	char *cwd, *buf = (char *) malloc(MAX);
+	char *cwd, *buf = (char *) malloc(MAX * sizeof(char));
 	int size;
 	if(buf == NULL) {
 		write(1, malloc_error, sizeof(malloc_error));
 		exit(EXIT_FAILURE);
 	}
-        char *myprompt = (char *) malloc(MAX);;
+        char *myprompt = (char *) malloc(MAX * sizeof(char));;
 	if(myprompt == NULL) {
 		write(1, malloc_error, sizeof(malloc_error));
 		exit(EXIT_FAILURE);
@@ -32,12 +34,12 @@ int main(int argc, char *argv[]) {
 	pid_t pid, w;
 	int fd_out, OUT_REDIR, STDOUT; 
 	int fd_in, IN_REDIR, STDIN; 
-	op_filename = (char *) malloc(MAX);
+	op_filename = (char *) malloc(MAX * sizeof(char));
 	if(op_filename == NULL) {
 		write(1, malloc_error, sizeof(malloc_error));
 		exit(EXIT_FAILURE);
 	}
-	ip_filename = (char *) malloc(MAX);
+	ip_filename = (char *) malloc(MAX * sizeof(char));
 	if(ip_filename == NULL) {
 		write(1, malloc_error, sizeof(malloc_error));
 		exit(EXIT_FAILURE);
@@ -58,6 +60,7 @@ int main(int argc, char *argv[]) {
 			}
 		}while(cwd == NULL);
 		sprintf(myprompt, "vaibshell:%s$ ", cwd);
+		//strcpy(myprompt, "vaibshell:~$ ");
                 write(1, myprompt, strlen(myprompt));
 
 
@@ -65,6 +68,7 @@ int main(int argc, char *argv[]) {
                 line = readline();
 		
 		/*code to check if line is empty */
+		/* Exceptions handling */
 		if(strlen(line) == 0) {
 			continue;
 		}
@@ -79,15 +83,17 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 		//write(1, line, strlen(line));
-		temp = (char *)malloc(strlen(line) + 1);
+		temp = (char *)malloc((strlen(line) + 1) * sizeof(char));
 		if(temp == NULL) {
 			write(1, malloc_error, sizeof(malloc_error));
 			exit(EXIT_FAILURE);
 		}
+		/* temp used since strtok changes the argument string */
 		strcpy(temp, line);
 		i = 0;
+		/* Code to tokenize the input string */
 		/* I didn't understand how after executing command "ls > filename", the fd "1" is reset to the previous stdout file? */
-		for(j = 1, str = temp;   ; j++, str = NULL) {
+		for(str = temp;   ; str = NULL) {
 			token = strtok_r(str, " ", &saveptr);		//What is meant by threadsafe?  what is there in saveptr?
 			if(token == NULL) {
 				break;
@@ -105,21 +111,22 @@ int main(int argc, char *argv[]) {
 		}
 		argp[i] = NULL;
 		n = i;
-		int argc = i;
+		argcount = i;
 		
-		if(argc == 0) {
-			continue;
+		/* Exceptions handling */
+		if(argcount == 0) {
+			continue;	//Possible error: continue can be used for while() loop? right?
 		}
 		/*code to execute "cd <directoryname>" command */
 		if(strcmp(argp[0], "cd") == 0) {
-			if(argc == 1) {
+			if(argcount == 1) {
 				argp[1] = "/home/vaibhav";
 			}
-			else if(argc != 2) {
+			else if(argcount != 2) {
 				fprintf(stderr, "Usage: %s <directory_path>\n", argp[0]);
 				exit(EXIT_FAILURE);
 			}
-			int dir = chdir(argp[1]);
+			dir = chdir(argp[1]);
 			if(dir == -1) {
 				perror("chdir:");
 				exit(EXIT_FAILURE);
@@ -239,14 +246,14 @@ int main(int argc, char *argv[]) {
 			} while(!WIFEXITED(status) && !WIFSIGNALED(status));
 		}
 		
-		free(mypromt);
-		free(buf);
 		free(line);
 		free(temp);
 		free(argp);
-		free(ip_filename);
-		free(op_filename);
         }
+	free(ip_filename);
+	free(op_filename);
+	free(myprompt);
+	free(buf);
         return 0;
 }
 
@@ -255,7 +262,7 @@ char *readline() {
         int i;
         char *str;
         int SIZE = 32;
-        str = (char *) malloc(SIZE);
+        str = (char *) malloc(SIZE * sizeof(char));
         if(str == NULL) {
                 char error[] = "Malloc failed\n";
                 write(1, error, strlen(error));
