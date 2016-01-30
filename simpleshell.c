@@ -6,24 +6,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#ifdef LINUX
-typedef int uint32
-#endif
-#ifdef WINDOWS
-typedef long uint32
-#endif
-#define MAX 64
+
+#define MAX 128 
 // Below 2 lines are for the function readline()
 //#define SPACE 0
 //#define ALPHA 1
 
 char *readline(void);
 int main(int argc, char *argv[]) {
-        char myprompt[] = "vaibshell:~$ ", *line = NULL;
-	char *temp = NULL, *str, *token, *saveptr, *command, **argp, *op_filename, *ip_filename;
-	int i, j, status, exec = 0;
-	pid_t pid, w;
 	char malloc_error[] = "malloc failed:\n";
+	char *cwd, *buf = (char *) malloc(MAX);
+	int size;
+	if(buf == NULL) {
+		write(1, malloc_error, sizeof(malloc_error));
+		exit(EXIT_FAILURE);
+	}
+        char *myprompt = (char *) malloc(MAX);;
+	if(myprompt == NULL) {
+		write(1, malloc_error, sizeof(malloc_error));
+		exit(EXIT_FAILURE);
+	}
+        char *line = NULL;
+	char *temp = NULL, *str, *token, *saveptr, *command, **argp, *op_filename, *ip_filename;
+	int i, j, status, exec = 0, n;
+	pid_t pid, w;
 	int fd_out, OUT_REDIR, STDOUT; 
 	int fd_in, IN_REDIR, STDIN; 
 	op_filename = (char *) malloc(MAX);
@@ -40,17 +46,33 @@ int main(int argc, char *argv[]) {
         while(1) {
 		OUT_REDIR = 0;
 		IN_REDIR = 0;
+
+
                 write(1, "\n", 1);
+		/*code to specify what to show as a prompt depending on the current directory */
+		size = MAX - 1;
+		do {
+			cwd = getcwd(buf, size);
+			if(cwd == NULL) {
+				size *= 2;
+			}
+		}while(cwd == NULL);
+		sprintf(myprompt, "vaibshell:%s$ ", cwd);
                 write(1, myprompt, strlen(myprompt));
+
+
                 //sleep(2);
                 line = readline();
+		//exits when "exit" command is used
+		if(strcmp(line, "exit") == 0) {
+			break;
+		}
 		argp = (char **) malloc((((strlen(line) + 1) / 2) + 1)* sizeof(char *));
 		if(argp == NULL) {
 			write(1, malloc_error, sizeof(malloc_error));
 			exit(EXIT_FAILURE);
 		}
 		//write(1, line, strlen(line));
-                //Now, check the no. of void spaces in the input excluding it at the first and at the end
 		temp = (char *)malloc(strlen(line) + 1);
 		if(temp == NULL) {
 			write(1, malloc_error, sizeof(malloc_error));
@@ -58,22 +80,40 @@ int main(int argc, char *argv[]) {
 		}
 		strcpy(temp, line);
 		i = 0;
+		/* I didn't understand how after executing command "ls > filename", the fd "1" is reset to the previous stdout file? */
 		for(j = 1, str = temp;   ; j++, str = NULL) {
-			token = strtok_r(str, " ", &saveptr);
+			token = strtok_r(str, " ", &saveptr);		//What is meant by threadsafe?  what is there in saveptr?
 			if(token == NULL) {
 				break;
 			}
-			if(j == 1) {
+			argp[i++] = token;
+			/*if(j == 1) {
 				//command = token;
 				argp[i++] = token;
-				printf("argument[%d] = %s\n", i - 1, argp[i - 1]);
+				//printf("argument[%d] = %s\n", i - 1, argp[i - 1]);
 			}
 			else {
 				argp[i++] = token;      //Don't we have to allocate memory for each argp[i] ? or it is allocated already?
-				printf("argument[%d] =  %s\n", i - 1, argp[i - 1]);
-			}
+				//printf("argument[%d] =  %s\n", i - 1, argp[i - 1]);
+			}*/
 		}
 		argp[i] = NULL;
+		n = i;
+		int argc = i;
+		
+		/*code to execute "cd <directoryname>" command */
+		if(strcmp(argp[0], "cd") == 0) {
+			if(argc != 2) {
+				fprintf(stderr, "Usage: %s <directory_path>\n", argp[0]);
+				exit(EXIT_FAILURE);
+			}
+			int dir = chdir(argp[1]);
+			if(dir == -1) {
+				perror("chdir:");
+				exit(EXIT_FAILURE);
+			}
+			continue;
+		}
 		
 		/*code to detect ">" and take appropriate action*/
 		i = 0;
@@ -84,19 +124,19 @@ int main(int argc, char *argv[]) {
 				strcpy(op_filename, argp[i]);
 				argp[i - 1] = NULL;
 				OUT_REDIR = 1;
-				printf("OUT_REDIR = %d\n", OUT_REDIR);
+				//printf("OUT_REDIR = %d\n", OUT_REDIR);
 				break;
 			}
 		}
 		
-		/*code to detect ">" and take appropriate action*/
+		/*code to detect "<" and take appropriate action*/
 		i = 0;
 		while(argp[i] != NULL) {
 			if(strcmp(argp[i++], "<") == 0) {
 				strcpy(ip_filename, argp[i]);
 				argp[i - 1] = NULL;
 				IN_REDIR = 1;
-				printf("IN_REDIR = %d\n", IN_REDIR);
+				//printf("IN_REDIR = %d\n", IN_REDIR);
 				break;
 			}
 		}
@@ -119,6 +159,8 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 		if(pid == 0) {// that means it is child
+			
+			/* Code for output redirection */
 			if(OUT_REDIR) {
 				STDOUT = dup(1);
 				close(1);
@@ -127,9 +169,11 @@ int main(int argc, char *argv[]) {
 					perror("File open failed");
 					exit(EXIT_FAILURE);
 				}
-				printf("fd_out = %d\n", fd_out);
+				//printf("fd_out = %d\n", fd_out);
 				
 			}
+
+			/* Code for input redirection */
 			if(IN_REDIR) {
 				STDIN = dup(0);
 				close(0);
@@ -138,10 +182,22 @@ int main(int argc, char *argv[]) {
 					perror("File open failed");
 					exit(EXIT_FAILURE);
 				}
-				printf("fd_in = %d\n", fd_in);
+				//printf("fd_in = %d\n", fd_in);
 				
 			}
-			printf("Child pid is %ld \n", (long) getpid());
+			
+			/* Code for pipe() */
+
+			/*if(PIPE) {		// Assuming that only pipe is present. Mix of > , < and | will be done later.
+				if(pipe(pipefd) == -1) {
+					perror("pipe failed");
+					exit(EXIT_FAILURE);
+				}
+				
+			}*/
+
+			
+			//printf("Child pid is %ld \n", (long) getpid());
 			exec = execvp(*argp, argp);
 			if(exec == -1) {
 				perror("exec failed");
@@ -157,16 +213,16 @@ int main(int argc, char *argv[]) {
 					exit(EXIT_FAILURE);
 				}
 				if(WIFEXITED(status)) {
-					printf("exited, status=%d\n", WEXITSTATUS(status));
+					//printf("exited, status=%d\n", WEXITSTATUS(status));
 				}
 				else if(WIFSIGNALED(status)) {
-					printf("killed by signal %d\n", WTERMSIG(status));
+					//printf("killed by signal %d\n", WTERMSIG(status));
 				}
 				else if(WIFSTOPPED(status)) {
-					printf("stopped by signal %d\n", WSTOPSIG(status));
+					//printf("stopped by signal %d\n", WSTOPSIG(status));
 				}
 				else if(WIFCONTINUED(status)) {
-					printf("continued\n");
+					//printf("continued\n");
 				}
 			} while(!WIFEXITED(status) && !WIFSIGNALED(status));
 		}
@@ -174,6 +230,8 @@ int main(int argc, char *argv[]) {
 		free(line);
 		free(temp);
 		free(argp);
+		free(ip_filename);
+		free(op_filename);
         }
         return 0;
 }
