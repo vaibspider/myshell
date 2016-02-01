@@ -15,7 +15,8 @@
 
 char *readline(void);
 int main(int argc, char *argv[]) {
-	int argcount, dir, pipes, narg, copy_start, tmp_i, tmp_j, k;
+	int argcount, dir, pipes, narg, copy_start, tmp_i, tmp_j, k, ret;
+	int **pipefd;
 	char **tmp_ptr;
 	char malloc_error[] = "malloc failed:\n";
 	char *cwd, *buf = (char *) malloc(MAX * sizeof(char));
@@ -93,6 +94,14 @@ int main(int argc, char *argv[]) {
 			i++;
 		}
 		printf("no of pipes detected = %d\n", pipes);
+		
+		/*code for allocating storage for the file descriptors */
+		if(pipes > 0) {
+			pipefd = (int **)malloc(pipes * sizeof(int*));
+			for(i = 0; i < pipes; i++) {
+				pipefd[i] = (int *)malloc(2 * sizeof(int));
+			}
+		}
 
 		/* code to malloc that no. of argument array which are one greater than the no of pipes in input command */
 		narg = pipes + 1;
@@ -216,10 +225,10 @@ int main(int argc, char *argv[]) {
 			i++;
 		}
 		printf("printed the contents successfully & now continuing to the while loop again\n");
-		continue;	/* This continue; must be eliminated after I complete the code for pipe handling */
+		//continue;	/* This continue; must be eliminated after I complete the code for pipe handling */
 		
 		/*code to detect ">" and take appropriate action*/
-		i = 0;
+		/*i = 0;
 		//printf("Came upto this!\n");
 		while(argp[0][i] != NULL) {
 			//printf("Came into while loop!\n");
@@ -230,9 +239,9 @@ int main(int argc, char *argv[]) {
 				//printf("OUT_REDIR = %d\n", OUT_REDIR);
 				break;
 			}
-		}
+		}*/
 		/*code to detect "<" and take appropriate action*/
-		i = 0;
+		/*i = 0;
 		while(argp[0][i] != NULL) {
 			if(strcmp(argp[0][i++], "<") == 0) {
 				strcpy(ip_filename, argp[0][i]);
@@ -241,7 +250,7 @@ int main(int argc, char *argv[]) {
 				//printf("IN_REDIR = %d\n", IN_REDIR);
 				break;
 			}
-		}
+		}*/
 
 
 		// Code to check whether strtok works or not? by printing the contents of command and arguments
@@ -254,86 +263,124 @@ int main(int argc, char *argv[]) {
 				break;
 		}
 		printf("\n\n");*/
-		
-		pid = fork();
-		if(pid == -1) {
-			perror("fork");
-			exit(EXIT_FAILURE);
-		}
-		if(pid == 0) {// that means it is child
-			
-			/* Code for output redirection */
-			if(OUT_REDIR) {
-				STDOUT = dup(1);
-				close(1);
-				fd_out = open(op_filename, O_WRONLY | O_CREAT, S_IRWXU);
-				if(fd_out == -1) {
-					perror("File open failed");
-					exit(EXIT_FAILURE);
-				}
-				//printf("fd_out = %d\n", fd_out);
-				
-			}
-
-			/* Code for input redirection */
-			if(IN_REDIR) {
-				STDIN = dup(0);
-				close(0);
-				fd_in = open(ip_filename, O_RDONLY);
-				if(fd_in == -1) {
-					perror("File open failed");
-					exit(EXIT_FAILURE);
-				}
-				//printf("fd_in = %d\n", fd_in);
-				
-			}
-			
-			/* Code for pipe() */
-
-			/*if(PIPE) {		// Assuming that only pipe is present. Mix of > , < and | will be done later.
-				if(pipe(pipefd) == -1) {
-					perror("pipe failed");
-					exit(EXIT_FAILURE);
-				}
-				
-			}*/
-
-			
-			//printf("Child pid is %ld \n", (long) getpid());
-			exec = execvp(*argp[0], argp[0]);
-			if(exec == -1) {
-				perror("exec failed");
+		printf("Now starting the forking\n");
+		for(i = 0; i < narg; i++) {
+			pid = fork();
+			printf("fork %d done\n", i);
+			if(pid == -1) {
+				perror("fork");
 				exit(EXIT_FAILURE);
 			}
-		}
-		else {		//that means it is parent
-			// I didn't understand why we need to use loop, why can't we use waitpid() just once?
-			do {
-				w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-				if(w == -1) {
-					perror("waitpid");
+			if(pid == 0) {// that means it is child
+				printf("In child now:\n");
+				/* Code for output redirection */
+				/*if(OUT_REDIR) {
+					STDOUT = dup(1);
+					close(1);
+					fd_out = open(op_filename, O_WRONLY | O_CREAT, S_IRWXU);
+					if(fd_out == -1) {
+						perror("File open failed");
+						exit(EXIT_FAILURE);
+					}
+					//printf("fd_out = %d\n", fd_out);
+					
+				}*/
+
+				/* Code for input redirection */
+				/*if(IN_REDIR) {
+					STDIN = dup(0);
+					close(0);
+					fd_in = open(ip_filename, O_RDONLY);
+					if(fd_in == -1) {
+						perror("File open failed");
+						exit(EXIT_FAILURE);
+					}
+					//printf("fd_in = %d\n", fd_in);
+					
+				}*/
+				
+				/* Code for pipe() */
+
+				/*if(PIPE) {		// Assuming that only pipe is present. Mix of > , < and | will be done later.
+					if(pipe(pipefd) == -1) {
+						perror("pipe failed");
+						exit(EXIT_FAILURE);
+					}
+					
+				}*/
+
+				if(narg > 1) {
+					printf("narg > 1\n");
+					ret = pipe(pipefd[i]);
+					if(ret == -1) {
+						perror("pipe failed");	
+						exit(EXIT_FAILURE);
+					}
+					if(i == 0) {
+						close(pipefd[i][0]);
+						STDOUT = dup(1);
+						close(1);
+						if(dup2(pipefd[i][1], 1) == -1) {
+							write(STDOUT, "dup2 error\n", 12);
+							exit(EXIT_FAILURE);
+						}
+					}
+					else if(i == narg - 1) {
+						close(pipefd[i][1]);
+						STDIN = dup(0);
+						close(1);
+						if(dup2(pipefd[i][1], 0) == -1) {
+							write(STDIN, "dup2 error\n", 12);
+							exit(EXIT_FAILURE);
+						}
+					}
+					else {
+						
+					}
+				}
+				printf("now doing execvp\n");
+				//printf("Child pid is %ld \n", (long) getpid());
+				exec = execvp(*argp[i], argp[i]);
+				if(exec == -1) {
+					perror("exec failed");
 					exit(EXIT_FAILURE);
 				}
-				if(WIFEXITED(status)) {
-					//printf("exited, status=%d\n", WEXITSTATUS(status));
-				}
-				else if(WIFSIGNALED(status)) {
-					//printf("killed by signal %d\n", WTERMSIG(status));
-				}
-				else if(WIFSTOPPED(status)) {
-					//printf("stopped by signal %d\n", WSTOPSIG(status));
-				}
-				else if(WIFCONTINUED(status)) {
-					//printf("continued\n");
-				}
-			} while(!WIFEXITED(status) && !WIFSIGNALED(status));
+			}
+			else {		//that means it is parent
+				// I didn't understand why we need to use loop, why can't we use waitpid() just once?
+				do {
+					w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
+					if(w == -1) {
+						perror("waitpid");
+						exit(EXIT_FAILURE);
+					}
+					if(WIFEXITED(status)) {
+						//printf("exited, status=%d\n", WEXITSTATUS(status));
+					}
+					else if(WIFSIGNALED(status)) {
+						//printf("killed by signal %d\n", WTERMSIG(status));
+					}
+					else if(WIFSTOPPED(status)) {
+						//printf("stopped by signal %d\n", WSTOPSIG(status));
+					}
+					else if(WIFCONTINUED(status)) {
+						//printf("continued\n");
+					}
+				} while(!WIFEXITED(status) && !WIFSIGNALED(status));
+			}
 		}
 		
 		free(line);
 		free(temp);
-		free(argp[0]);
 		for(j = 0; j < narg; j++) {
 			free(argp[j]);
+		}
+		free(argp);
+		if(pipes > 0) {
+			for(i = 0; i < pipes; i++) {
+				free(pipefd[i]);
+			}
+			free(pipefd);
 		}
         }
 	free(ip_filename);
