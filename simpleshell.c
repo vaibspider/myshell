@@ -521,8 +521,17 @@ int main(int argc, char *argv[]) {
 							printf("continued\n");
 						}
 					} while(!WIFEXITED(status) && !WIFSIGNALED(status));
-					if(pipes > 0 && i == 0) {
-						close(pipefd[p_write][1]);
+					if(pipes > 0) {
+						if(i == 0) {
+							close(pipefd[p_write][1]);
+						}
+						else if(i == narg - 1) {
+							close(pipefd[p_read][0]);
+						}
+						else {
+							close(pipefd[p_read][0]);
+							close(pipefd[p_write][1]);
+						}
 					}
 				}
 				
