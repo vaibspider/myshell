@@ -9,6 +9,9 @@
 #include <error.h>
 #include <signal.h>
 
+//#include <readline/readline.h>
+//#include <readline/history.h>
+
 #define MAX 256
 // Below 2 lines are for the function readline()
 //#define SPACE 0
@@ -59,6 +62,7 @@ int main(int argc, char *argv[]) {
 	
 	size = MAX - 1;
         while(1) {
+		background = 0;
 		OUT_REDIR = 0;
 		IN_REDIR = 0;
 
@@ -176,8 +180,10 @@ int main(int argc, char *argv[]) {
 		argcount = i;
 		
 		/* exit */
-		if(strcmp(argp[0][0], "exit") == 0) {
-			break;
+		if(argp[0][0] != NULL) {
+			if(strcmp(argp[0][0], "exit") == 0) {
+				break;
+			}
 		}
 		
 		/* Exceptions handling */
@@ -325,6 +331,7 @@ int main(int argc, char *argv[]) {
 				while(argp[i][j] != NULL) {
 					if(strcmp(argp[i][j], "&") == 0) {
 						background = 1;
+						printf("background = %d\n", background);
 					}
 					if(strcmp(argp[i][j], ">") == 0) {
 						OUT_REDIR = 1;
@@ -359,6 +366,7 @@ int main(int argc, char *argv[]) {
 					//argp[tmp_i][tmp_j] = NULL;
 				}
 				if(background == 1) {
+					printf("came in background\n");
 					j = 0;
 					while(argp[i][j] != NULL) {
 						if(strcmp(argp[i][j], "&") == 0) {
@@ -494,33 +502,30 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else {		//that means it is parent
-				//for(j = 0; j < pipes; j++) {
-				//	wait(NULL);
-				//}
-					
 				// I didn't understand why we need to use loop, why can't we use waitpid() just once?
-				//if(i == narg - 1) {
 				if(background == 0) {
-					do {
-						//printf("parent waiting...\n");
-						w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-						if(w == -1) {
-							perror("waitpid");
-							exit(EXIT_FAILURE);
-						}
-						if(WIFEXITED(status)) {
-							printf("exited, status=%d\n", WEXITSTATUS(status));
-						}
-						else if(WIFSIGNALED(status)) {
-							printf("killed by signal %d\n", WTERMSIG(status));
-						}
-						else if(WIFSTOPPED(status)) {
-							printf("stopped by signal %d\n", WSTOPSIG(status));
-						}
-						else if(WIFCONTINUED(status)) {
-							printf("continued\n");
-						}
-					} while(!WIFEXITED(status) && !WIFSIGNALED(status));
+					if(pipes == 0) {
+						do {
+							//printf("parent waiting...\n");
+							w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
+							if(w == -1) {
+								perror("waitpid");
+								exit(EXIT_FAILURE);
+							}
+							if(WIFEXITED(status)) {
+								printf("exited, status=%d\n", WEXITSTATUS(status));
+							}
+							else if(WIFSIGNALED(status)) {
+								printf("killed by signal %d\n", WTERMSIG(status));
+							}
+							else if(WIFSTOPPED(status)) {
+								printf("stopped by signal %d\n", WSTOPSIG(status));
+							}
+							else if(WIFCONTINUED(status)) {
+								printf("continued\n");
+							}
+						} while(!WIFEXITED(status) && !WIFSIGNALED(status));
+					}
 					if(pipes > 0) {
 						if(i == 0) {
 							close(pipefd[p_write][1]);
@@ -534,11 +539,6 @@ int main(int argc, char *argv[]) {
 						}
 					}
 				}
-				
-				/*close(pipefd[p_write][1]);
-				if(i == narg-1)
-					close(*/
-				//}
 			}
 		}
 		
